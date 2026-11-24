@@ -1,31 +1,59 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#132b49"><meta name="description" content="Bat as Vaibhav Suryavanshi. Face three fictional bowlers in one over and time your swing for six.">
-<title>Play the Suryavanshi</title><link rel="stylesheet" href="./stadium.css"><script type="module" src="./game.js"></script></head>
-<body><main>
-<header><span>FLOODLIGHT ARCADE</span><span>ONE-OVER CRICKET</span></header>
-<div class="mast"><h1>Play the <em>Suryavanshi</em></h1><p>You’re batting as <strong>Vaibhav Suryavanshi</strong>.<br>Six deliveries. Three bowlers. How many sixes?</p></div>
-<div class="mode"><label><input id="chaseMode" type="checkbox"> Last-over challenge: 24 to win from six balls</label><span>Choose before starting an over.</span></div>
-<section class="match" aria-label="Match centre">
-<div class="score"><div><small>On strike</small><b>V. Suryavanshi</b></div><div><small>Runs</small><b id="runs">0</b></div><div><small>Sixes</small><b id="sixes">0</b></div><div><small>Ball</small><b id="ball">1 / 6</b></div></div>
-<div id="chase" class="chase" role="status" hidden></div>
-<svg id="ground" viewBox="0 0 800 200" role="img" aria-label="The bowler delivers to a left-handed batter under floodlights">
-<rect width="800" height="200" fill="#172d49"/><g fill="#9cb7bd"><circle cx="50" cy="45" r="2"/><circle cx="275" cy="34" r="2"/><circle cx="583" cy="22" r="2"/></g>
-<path d="M0 88 Q400 145 800 78 V200 H0Z" fill="#1a6558"/><path d="M0 108 Q400 158 800 99" fill="none" stroke="#95cdb1" stroke-width="2"/>
-<g fill="#fbe5ad"><path d="M41 14h56l-4 8H37zM705 14h56l4 8h-56z"/><path d="M64 20h2l-9 73h-2zM735 20h2l9 73h-2z"/></g>
-<path d="m135 159 524 -1 39 14 -598 1z" fill="#d9b585"/><path d="M185 154v21m445-21v22" stroke="white" stroke-width="3"/>
-<g id="bowlerFigure" fill="none" stroke="#66cdc4" stroke-width="9" stroke-linecap="round"><circle cx="180" cy="91" r="9" fill="#66cdc4" stroke="none"/><path d="m180 107 -6 23 -17 24m17-24 18 21m-12-42 18-8 4-19m-21 27-15 7"/></g>
-<g fill="none" stroke="#f4cb60" stroke-width="9" stroke-linecap="round"><circle cx="631" cy="101" r="10" fill="#f4cb60" stroke="none"/><path d="m632 117 4 19 -13 23m13-23 14 23m-17-42-15 7-10-10"/>
-<path id="bat" d="m608 114-21-30" stroke="#ffebd3" stroke-width="10"/></g>
-<g stroke="white" stroke-width="3"><path d="M651 135v26m5-26v26m5-26v26"/></g>
-<circle id="delivery" cx="202" cy="84" r="6" fill="#fff3ce" stroke="#943c39" stroke-width="3"/>
-</svg>
-<div class="commentary"><b id="call" role="status">The crowd is waiting.</b><span id="bowler">Kite · Seam</span></div>
-<div class="rail" aria-label="Timing meter"><div id="fourZone"></div><div id="sixZone"></div><div id="marker"></div></div>
-<div class="legend"><span>RELEASE</span><span>GOLD = SIX</span><span>LATE</span></div>
-<div class="controls"><button id="action" type="button">Walk out to bat</button><span id="tip">Press Space or tap the button. Swing when the marker reaches gold.</span></div>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060a14"><meta name="description" content="Bat as Vaibhav Suryavanshi, a left-hander, in a floodlit night match. Pick your side, time your swing and clear the rope.">
+<title>Play the Suryavanshi</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23ffc93c'/%3E%3Cpath d='M5 21c8-3 14-9 17-17' stroke='%23060a14' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="./stadium.css"><script type="module" src="./game.js"></script></head>
+<body data-phase="title" data-render="loading">
+<canvas id="view" role="img" aria-label="A floodlit night match. Vaibhav Suryavanshi, a left-handed batter in royal blue, faces the bowler."></canvas>
+<main class="hud">
+<header class="top">
+<section class="bug" aria-label="Scorecard">
+<div class="who"><small>On strike</small><b>V. Suryavanshi</b></div>
+<div><small>Runs</small><b id="runs">0</b></div>
+<div><small>Sixes</small><b id="sixes">0</b></div>
+<div><small>Ball</small><b id="ball">1 / 6</b></div>
+<div id="chaseStatus" role="status" hidden></div>
+<ol id="shots" aria-label="Runs per delivery"></ol>
 </section>
-<section class="scorecard"><h2>Your over</h2><ol id="shots" aria-label="Runs per delivery"></ol></section>
+<section class="bowl" aria-label="Bowler"><small>Bowling</small><b id="bowler">Kite · Seam</b><span id="speed"></span></section>
+</header>
+<p id="notice" role="status"></p>
+<section class="banner"><b id="call" role="status">The crowd is waiting.</b><span id="detail" role="status"></span></section>
+<section class="card title" id="title" aria-label="Welcome">
+<small>Floodlit night · one-over match</small>
+<h1>Play the <em>Suryavanshi</em></h1>
+<p>You’re batting as <strong>Vaibhav Suryavanshi</strong>, left-hander.<br>Six deliveries. Three bowlers. How many sixes?</p>
+<ul class="keys" aria-label="Controls">
+<li><kbd>←</kbd><span>Off side</span></li>
+<li><kbd>↑</kbd><kbd>Space</kbd><span>Straight</span></li>
+<li><kbd>→</kbd><span>Leg side</span></li>
+</ul>
+<p class="how">Press a key as the ball crosses the gold strip: the key picks the direction, your timing picks the runs. Too early or too late is a dot ball.</p>
+<label><input id="chase" type="checkbox"> Last-over challenge: 24 from six balls</label>
 <p class="fine">A fictional fan-made arcade game. Opponents are invented; no affiliation or endorsement. No accounts or tracking.</p>
 <noscript>Enable JavaScript to play the timing game.</noscript>
-</main></body></html>
+</section>
+<section class="card summary" id="summary" aria-label="Over summary">
+<small>Your over</small>
+<div class="total"><b id="total">0</b><span>runs</span></div>
+<p id="rank"></p>
+<svg id="wheel" viewBox="-100 -100 200 200" role="img" aria-label="Wagon wheel of your shots">
+<circle r="96" class="w-field"/><circle r="64" class="w-ring"/><circle r="30" class="w-ring"/><rect x="-3.5" y="-15" width="7" height="30" rx="1.5" class="w-pitch"/>
+<g id="spokes"></g><text x="0" y="-86" class="w-lab">BOWLER</text><text x="-92" y="3" class="w-lab w-l">OFF</text><text x="92" y="3" class="w-lab w-r">LEG</text>
+</svg>
+<p class="key"><i class="k6"></i>Six <i class="k4"></i>Four <i class="k1"></i>Single</p>
+</section>
+<footer class="dock">
+<div class="rail" role="img" aria-label="Timing meter: swing when the marker reaches the gold zone"><div id="fourZone"></div><div id="sixZone"></div><div id="marker"></div></div>
+<div class="legend" aria-hidden="true"><span>RELEASE</span><span>GOLD = SIX</span><span>LATE</span></div>
+<div class="pad">
+<button id="off" type="button" aria-disabled="true">← Off side</button>
+<button id="action" type="button">Walk out to bat</button>
+<button id="leg" type="button" aria-disabled="true">Leg side →</button>
+</div>
+<p id="tip">Swing with ← ↑ → as the marker reaches gold.</p>
+<div class="opts"><label><input id="guide" type="checkbox" checked> Pitch guide</label><button id="mute" type="button" aria-pressed="true">Sound</button></div>
+</footer>
+</main>
+</body></html>

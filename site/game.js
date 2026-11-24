@@ -1,85 +1,205 @@
-import { OVER, bat, batChase, bowlerAt, chaseState, newInnings, timing } from "./rules.js";
+// The game: the clock, the controls and the scoreboard. The rules live in rules.js, the timeline in match.js, the picture in scene.js.
+import { OVER, chaseState, timing } from "./rules.js";
+import { FIELD, contactP, plan, stumpsHit } from "./flight.js";
+import { createMatch } from "./match.js";
+import { createSound } from "./sound.js";
 
 const $ = id => document.getElementById(id);
-let innings = newInnings(), phase = "ready", release = 0, nextAt = 0, frame = 0, impact = 0, challenge = false;
-const motion = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+const el = Object.fromEntries("view runs sixes ball shots bowler speed call detail tip action off leg marker fourZone sixZone guide mute notice total rank wheel spokes chase chaseStatus".split(" ").map(id => [id, $(id)]));
+const body = document.body, query = new URLSearchParams(location.search), low = query.get("q") === "low";
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const match = createMatch(), m = match.state, sound = createSound(), heard = new Set();
+let scene = null, guide = el.guide.checked, scale = low ? 0.6 : 1;
+
 for (const [id, radius] of [["fourZone", timing.four], ["sixZone", timing.six]]) {
-  $(id).style.left = `${100 * (timing.centre - radius)}%`;
-  $(id).style.width = `${radius * 200}%`;
+  el[id].style.left = `${100 * (timing.centre - radius)}%`;
+  el[id].style.width = `${200 * radius}%`;
+}
+
+// --- the clock: it stops while the tab is hidden, so a ball in flight waits for you instead of playing itself out
+let offset = 0, hiddenAt = null;
+const now = () => performance.now() - offset;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) hiddenAt = performance.now();
+  else if (hiddenAt != null) { offset += performance.now() - hiddenAt; hiddenAt = null; }
+});
+
+// --- small writers: only touch the page when a value changed
+const put = (node, value) => { value = String(value); if (node.textContent !== value) node.textContent = value; };
+const action = (label, enabled) => { put(el.action, label); el.action.setAttribute("aria-disabled", String(!enabled)); };
+const sides = on => { for (const b of [el.off, el.leg]) b.setAttribute("aria-disabled", String(!on)); };
+const bowled = d => stumpsHit(d.pl) && !d.shot;
+
+function say(text, kind, fresh) {
+  put(el.call, text);
+  if (kind) body.dataset.call = kind; else delete body.dataset.call;
+  if (fresh && !reduced) el.call.animate?.([{ transform: "scale(.88)", opacity: 0.3 }, { transform: "scale(1)", opacity: 1 }], { duration: 260, easing: "cubic-bezier(.2,.9,.3,1.3)" });
+}
+function card(pl) {
+  put(el.bowler, `${pl.bowler.name} · ${pl.bowler.style}`); put(el.speed, `${pl.prof.kmh} km/h`);
+  body.style.setProperty("--b", pl.bowler.color);
 }
 function renderCard() {
-  $("runs").textContent = innings.runs;
-  $("sixes").textContent = innings.sixes;
-  $("ball").textContent = `${Math.min(innings.shots.length + 1, OVER)} / ${OVER}`;
-  $("chase").hidden = !challenge;
-  if (challenge) {
-    const { runsRemaining, ballsRemaining } = chaseState(innings);
-    $("chase").textContent = `${runsRemaining} ${runsRemaining === 1 ? "run" : "runs"} needed from ${ballsRemaining} ${ballsRemaining === 1 ? "ball" : "balls"}`;
+  const { runs, sixes, shots } = m.innings;
+  put(el.runs, runs); put(el.sixes, sixes); put(el.ball, `${Math.min(shots.length + 1, OVER)} / ${OVER}`);
+  el.chaseStatus.hidden = !m.chase;
+  if (m.chase) {
+    const { runsRemaining, ballsRemaining } = chaseState(m.innings);
+    put(el.chaseStatus, `${runsRemaining} runs needed from ${ballsRemaining} balls`);
   }
-  $("shots").replaceChildren(...Array.from({length: OVER}, (_, i) => {
-    const chip = document.createElement("li"), runs = innings.shots[i];
-    chip.textContent = runs ?? "–"; if (runs === 6) chip.classList.add("six");
+  el.shots.replaceChildren(...Array.from({ length: OVER }, (_, i) => {
+    const chip = document.createElement("li"), runs = shots[i];
+    chip.textContent = runs ?? "–";
+    if (runs === 6) chip.classList.add("six"); else if (runs === 4) chip.classList.add("four"); else if (runs > 0) chip.classList.add("run");
     chip.setAttribute("aria-label", `Ball ${i + 1}: ${runs ?? "not bowled"}`); return chip;
   }));
 }
-function paint(position, loft = 0) {
-  $("marker").style.left = `${position * 100}%`;
-  const travel = Math.min(1, position / timing.centre);
-  $("delivery").setAttribute("cx", 202 + travel * 406 - loft * 220);
-  $("delivery").setAttribute("cy", 84 + travel * 39 - (motion ? Math.sin(travel * Math.PI) * 26 : 0) - loft * 120);
-  $("bat").setAttribute("transform", loft > 0 ? "rotate(-70 608 114)" : "");
-}
-function bowl(now) {
-  phase = "flight"; release = now;
-  const bowler = bowlerAt(innings.shots.length);
-  $("bowler").textContent = `${bowler.name} · ${bowler.style}`;
-  $("bowlerFigure").setAttribute("stroke", bowler.color);
-  $("bowlerFigure").querySelector("circle").setAttribute("fill", bowler.color);
-  $("call").textContent = `${bowler.name} bowls…`; $("tip").textContent = bowler.release;
-  $("action").textContent = "Swing!"; $("action").setAttribute("aria-disabled", "false"); paint(0);
-}
-function positionAt(now) {
-  return Math.max(0, Math.min(1, (now - release) / bowlerAt(innings.shots.length).flight));
-}
-function settle(position, now) {
-  innings = (challenge ? batChase : bat)(innings, position); impact = position; renderCard();
-  const runs = innings.shots.at(-1);
-  $("call").textContent = ["Dot ball.", "Quick single!"][runs] ?? (runs === 6 ? "SIX! Into the stands!" : "FOUR! Through the gap!");
-  phase = "between"; nextAt = now + 1050;
-  $("action").textContent = "Ball dead"; $("action").setAttribute("aria-disabled", "true");
-  $("tip").textContent = innings.shots.length === OVER || (challenge && chaseState(innings).result !== "playing") ? "The scorer is adding it up." : "Get set for the next delivery.";
-  paint(position);
-}
-function tick(now) {
-  if (phase === "flight") {
-    const pos = positionAt(now); paint(pos);
-    if (pos === 1) settle(1, now);
-  } else if (phase === "between") {
-    if (motion && innings.shots.at(-1) === 6) paint(impact, 1 - Math.max(0, nextAt - now) / 1050);
-    if (now >= nextAt) {
-      if (innings.shots.length < OVER && (!challenge || chaseState(innings).result === "playing")) bowl(now);
-      else {
-        phase = "done";
-        $("call").textContent = challenge ? (chaseState(innings).result === "won" ? "Chase won!" : "Chase lost.") : `Over complete: ${innings.runs} runs!`;
-        $("chaseMode").disabled = false;
-        $("action").textContent = "Bat again"; $("action").setAttribute("aria-disabled", "false");
-        $("tip").textContent = `Vaibhav hit ${innings.sixes} ${innings.sixes === 1 ? "six" : "sixes"}.`;
-      }
-    }
+
+// --- what the commentary says about a settled ball
+const near = (x, z) => FIELD.reduce((a, f) => Math.hypot(f.at[0] - x, f.at[1] - z) < Math.hypot(a.at[0] - x, a.at[1] - z) ? f : a).name;
+const feel = (kind, off) => Math.abs(off) < 0.012 ? "Perfect timing" : kind === "six" ? "Middled it" : kind === "four" ? `A touch ${off < 0 ? "early" : "late"}` : `Mistimed ${off < 0 ? "early" : "late"}`;
+function result(d) {
+  const sh = d.shot, off = d.pc - timing.centre;
+  if (sh) {
+    const [x, , z] = sh.end, side = Math.abs(x) < 9 && z < -30 ? null : near(x, z), how = feel(sh.kind, off);
+    if (sh.kind === "six") return ["SIX! Into the stands!", `${Math.round(Math.hypot(x - sh.from[0], z - sh.from[2]))} m · ${side ? `over ${side}` : "straight down the ground"} · ${how}`, "six"];
+    if (sh.kind === "four") return ["FOUR! Through the gap!", `${side ? `Past ${side}` : "Straight past the bowler"} · ${how}`, "four"];
+    return ["Quick single!", `Pushed to ${side ?? "mid-on"} · ${how}`, "single"];
   }
-  if (phase === "flight" || phase === "between") frame = requestAnimationFrame(tick);
+  if (bowled(d)) return ["Timber!", "Bowled him! Arcade rules: no wickets, no problem.", "dot"];
+  return ["Dot ball.", !d.press ? "No shot offered." : d.pc < 0.3 ? "Way too early" : d.pc < timing.centre ? "Too early" : "Too late", "dot"];
 }
-function act() {
-  const now = performance.now();
-  if (phase === "flight") settle(positionAt(now), now);
-  else if (phase === "ready" || phase === "done") {
-    cancelAnimationFrame(frame); challenge = $("chaseMode").checked; $("chaseMode").disabled = true;
-    innings = newInnings(); renderCard(); bowl(now); frame = requestAnimationFrame(tick);
+const rank = r => r === 36 ? "Six for six. Zero defects. Ship it." : r >= 25 ? "Merge-ready — just one flaky test." : r >= 13 ? "Needs review. Several comments." : r > 0 ? "Tests failing. Back to the nets." : "Build failed. Did you press anything?";
+const cheer = { six: sound.six, four: sound.four, single: sound.single, dot: sound.miss };
+
+// --- wagon wheel: bowler at the top, off side on the left, one spoke per shot
+const mark = (tag, attrs) => { const node = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v); return node; };
+function renderWheel() {
+  const settled = m.deliveries.filter(d => d.settled), marks = [];
+  let dots = 0;
+  for (const { shot: sh } of settled) {
+    if (!sh) { marks.push(mark("circle", { cx: (dots++ - 2.5) * 9, cy: 24, r: 3, fill: "#ff6b57" })); continue; }
+    const len = { six: 88, four: 72 }[sh.kind] ?? 30, stroke = { six: "#ffc93c", four: "#5df2b0" }[sh.kind] ?? "#fff";
+    marks.push(mark("line", { x1: 0, y1: 0, x2: (Math.sin(sh.psi) * len).toFixed(1), y2: (-Math.cos(sh.psi) * len).toFixed(1), stroke }));
+  }
+  el.spokes.replaceChildren(...marks);
+  const count = r => settled.filter(d => d.runs === r).length;
+  el.wheel.setAttribute("aria-label", `Wagon wheel: ${count(6)} sixes, ${count(4)} fours, ${count(1)} singles, ${count(0)} dot balls`);
+}
+
+// --- the match, as the page sees it
+function begin() {
+  if (!match.begin(now(), { chase: el.chase.checked })) return;
+  if (document.activeElement === el.chase) el.action.focus();
+  heard.clear(); card(plan(0)); renderCard(); renderWheel();
+  say("Vaibhav takes guard…"); put(el.detail, ""); put(el.tip, "Get set. Swing with ← ↑ → as the ball crosses the gold strip.");
+  action("Taking guard…", false); sides(false); sound.tick();
+}
+function swing(dir) {
+  if (!match.swing(dir, now())) return;
+  sound.swish(); action("Ball dead", false); sides(false);
+}
+const act = () => m.phase === "title" || m.phase === "done" ? begin() : swing("straight");
+
+function handle(e, n) {
+  const fresh = n - e.at < 500; // after a long stall the scoreboard catches up quietly
+  if (e.type === "start") {
+    const { bowler } = e.d.pl;
+    card(e.d.pl); say(`${bowler.name} bowls…`, null, fresh); put(el.detail, ""); put(el.tip, bowler.release); action("Swing!", true); sides(true);
+  } else if (e.type === "settle") {
+    const d = e.d, [call, detail, kind] = result(d);
+    renderCard(); renderWheel(); say(call, kind, fresh); put(el.detail, detail);
+    action("Ball dead", false); sides(false); put(el.tip, d.i === OVER - 1 || (m.chase && chaseState(m.innings).result === "won") ? "The scorer is adding it up." : "Get set for the next delivery.");
+    if (fresh && !(kind === "dot" && bowled(d))) cheer[kind]();
+    if (fresh && kind === "six" && !reduced) navigator.vibrate?.(40);
+  } else if (e.type === "lead") {
+    card(plan(e.next));
+  } else if (e.type === "finish") {
+    const { runs, sixes } = m.innings;
+    const outcome = m.chase ? chaseState(m.innings).result : null;
+    say(outcome ? `Chase ${outcome}: ${runs} runs!` : `Over complete: ${runs} runs!`, null, fresh); put(el.detail, ""); put(el.tip, `Vaibhav hit ${sixes} ${sixes === 1 ? "six" : "sixes"}.`);
+    put(el.total, runs); put(el.rank, outcome ? (outcome === "won" ? "Target reached!" : "Target missed.") : rank(runs)); action("Bat again", true); sides(false);
   }
 }
-$("action").addEventListener("click", act);
-window.addEventListener("keydown", event => {
-  if (event.code !== "Space" || ![document.body, $("action")].includes(document.activeElement)) return;
-  event.preventDefault(); if (!event.repeat) act();
+
+// Sounds that belong to the ball rather than to the bat: the bounce, and the stumps going over.
+function ambient(n) {
+  const d = match.current;
+  if (m.phase !== "play" || !d) return;
+  const once = (key, at, play) => { if (n < at || heard.has(key)) return; heard.add(key); if (n - at < 400) play(); };
+  once(`${d.i}:bounce`, d.T + d.pl.tBounce, sound.bounce);
+  once(`${d.i}:wicket`, d.T + d.pl.tBounce + d.pl.F * (-d.pl.zb / d.pl.L), () => { if (bowled(d)) sound.bowled(); });
+}
+
+function paint(n) {
+  const d = match.current, p = m.phase === "play" && d ? (d.press ? d.pc : contactP(d.pl, n - d.T)) : 0, left = `${(p * 100).toFixed(2)}%`;
+  if (el.marker.style.left !== left) el.marker.style.left = left;
+  if (body.dataset.phase !== m.phase) body.dataset.phase = m.phase;
+}
+
+// --- the picture: WebGL when the browser has it, otherwise the same game with the scoreboard doing the talking
+function fallback(why) {
+  scene = null; body.dataset.render = "dom"; put(el.notice, why);
+}
+async function boot() {
+  if (query.get("gl") === "off") return fallback("The 3D stadium is switched off (?gl=off). Same rules, same timing.");
+  try {
+    const [{ createStadium }, { createScene }] = await Promise.all([import("./stadium.js"), import("./scene.js")]);
+    const stadium = createStadium(el.view, { low, onLost: () => fallback("The 3D stadium was interrupted, so you’re in lite mode. Same rules, same timing.") });
+    scene = createScene(stadium, { reduced }); body.dataset.render = "webgl";
+  } catch (error) {
+    console.warn(error); fallback("This browser can’t draw the 3D stadium (it needs WebGL 2), so you’re in lite mode. Same rules, same timing.");
+  }
+}
+
+let wall = performance.now(), avg = 16, slow = 0;
+function loop() {
+  requestAnimationFrame(loop);
+  const n = now(), clock = performance.now(), dt = clock - wall; wall = clock;
+  for (const e of match.update(n)) handle(e, n);
+  ambient(n); paint(n);
+  if (!scene) return;
+  try { scene.frame(m, n, { assist: guide, scale }); } catch (error) { console.warn(error); fallback("The 3D stadium hit a problem, so you’re in lite mode. Same rules, same timing."); return; }
+  if (dt < 250) { // a slow GPU, not a stalled tab: trade sharpness for smoothness, never the other way round
+    avg += (dt - avg) * 0.1; slow = avg > 40 ? slow + 1 : 0;
+    if (slow > 20 && scale > 0.5) { scale = Math.max(0.5, scale * 0.85); slow = 0; }
+  }
+}
+
+// --- controls
+const KEYS = { ArrowUp: "straight", KeyW: "straight", ArrowLeft: "off", KeyA: "off", ArrowRight: "leg", KeyD: "leg" };
+const toggleGuide = () => { el.guide.checked = !el.guide.checked; guide = el.guide.checked; };
+const toggleSound = () => { const muted = sound.toggle(); el.mute.setAttribute("aria-pressed", String(!muted)); };
+const restsOn = a => a === body || a === el.action;
+addEventListener("keydown", event => {
+  sound.unlock();
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  const a = document.activeElement;
+  // Space is the swing only where it would not already mean something else (a focused checkbox or button keeps its own Space).
+  if (event.code === "Space" && restsOn(a)) { event.preventDefault(); if (!event.repeat) act(); return; }
+  if (event.repeat) return;
+  const dir = KEYS[event.code];
+  if (dir) { if (restsOn(a) || a?.tagName === "BUTTON" || a === el.guide) { event.preventDefault(); swing(dir); } }
+  else if (event.code === "KeyT") toggleGuide();
+  else if (event.code === "KeyM") toggleSound();
 });
-renderCard(); paint(0);
+addEventListener("keyup", event => { if (event.code === "Space" && restsOn(document.activeElement)) event.preventDefault(); });
+for (const type of ["pointerdown", "touchend", "click"]) addEventListener(type, () => sound.unlock(), { capture: true, passive: true });
+
+// A swing happens on pointerdown, not on click: waiting for the finger to lift costs the timing. A click with no pointer behind it
+// (Enter on a focused button, a screen reader, a script) still works.
+for (const [id, press] of [["off", () => swing("off")], ["action", act], ["leg", () => swing("leg")]]) {
+  el[id].addEventListener("pointerdown", event => { if (event.button > 0) return; event.preventDefault(); press(); });
+  el[id].addEventListener("click", event => { if (event.detail === 0) press(); });
+}
+el.view.addEventListener("pointerdown", event => {
+  if (event.button > 0) return;
+  if (m.phase === "title") return act();
+  const box = el.view.getBoundingClientRect(), x = (event.clientX - box.left) / box.width;
+  swing(x < 1 / 3 ? "off" : x > 2 / 3 ? "leg" : "straight");
+});
+el.guide.addEventListener("change", () => { guide = el.guide.checked; });
+el.mute.addEventListener("click", toggleSound);
+
+card(plan(0)); renderCard(); renderWheel(); body.dataset.phase = m.phase;
+requestAnimationFrame(loop); boot();

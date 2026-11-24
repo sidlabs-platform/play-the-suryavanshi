@@ -1,4 +1,8 @@
 #!/bin/sh
 set -eu
-git diff --cached --no-renames --name-only -z | node scripts/scope.js staged
+# A merge commit inherits everything the other side changed. What this branch adds is its difference from the commit being
+# merged in, which is the same file list the pull-request check sees.
+base=HEAD
+if [ -f "$(git rev-parse --git-path MERGE_HEAD)" ]; then base=MERGE_HEAD; fi
+git diff --cached --no-renames --name-only -z "$base" | node scripts/scope.js staged
 npm test
