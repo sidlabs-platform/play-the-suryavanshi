@@ -1,0 +1,59 @@
+// Run with node test/features/run-chase-browser after installing Playwright's Chromium.
+import assert from "node:assert/strict";
+import { once } from "node:events";
+import { chromium } from "playwright-core";
+import { GAP_MS, LEAD_MS, SWING_MS, perfectPress, plan, shot } from "../../site/flight.js";
+import { timing } from "../../site/rules.js";
+import { prefix, serve } from "../../scripts/serve.js";
+
+const server = serve().listen(0, "127.0.0.1");
+let browser;
+try {
+  await once(server, "listening");
+  browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 375, height: 780 } });
+  const errors = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
+  await page.clock.pauseAt(new Date("2026-01-01T00:00:10Z"));
+  await page.goto(`http://127.0.0.1:${server.address().port}${prefix}?gl=off`);
+  const text = id => page.locator(`#${id}`).textContent();
+  const clock = () => page.evaluate(() => performance.now());
+  const at = async t => { const ms = Math.round(t - await clock()); if (ms > 0) await page.clock.fastForward(ms); };
+  await page.selectOption("#mode", "chase");
+  await page.fill("#target", "37");
+  await page.fill("#overs", "2");
+  await page.locator("#action").focus();
+  const start = await clock();
+  await page.keyboard.press("Space");
+  assert.match(await text("chaseStatus"), /37 needed from 12 balls · Required rate 18.50/);
+  let T = start + LEAD_MS;
+  for (let i = 0; i < 7; i++) {
+    const pl = plan(i), press = T + perfectPress(pl);
+    await at(press);
+    await page.keyboard.press("ArrowUp");
+    const contact = press + SWING_MS;
+    await at(contact + 50);
+    assert.equal(await text("runs"), String((i + 1) * 6));
+    if (i === 0) assert.match(await text("chaseStatus"), /31 needed from 11 balls · Required rate 16.91/);
+    T = contact + shot("straight", 6, timing.centre, pl).after + GAP_MS;
+  }
+  await at(T - GAP_MS + 50);
+  assert.equal(await text("call"), "Chase won! 42 runs!");
+  assert.match(await text("rank"), /You win/);
+  assert.match(await text("chaseStatus"), /0 needed from 5 balls · Required rate 0.00/);
+  await page.locator("#setupAgain").click();
+  await page.fill("#target", "1");
+  await page.fill("#overs", "1");
+  await page.locator("#action").focus();
+  await page.keyboard.press("Space");
+  await at(await clock() + 100000);
+  assert.equal(await text("call"), "Chase lost! 0 runs!");
+  assert.match(await text("chaseStatus"), /1 needed from 0 balls · Required rate —/);
+  assert.match(await text("rank"), /You lose/);
+  assert.deepEqual(errors, []);
+  console.log("ok run chase: 42 from seven deliveries wins; six dots lose");
+} finally {
+  await browser?.close();
+  await new Promise(resolve => server.close(resolve));
+}
