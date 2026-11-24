@@ -27,6 +27,10 @@ With Node 22+ installed: `npm start`, then open `http://127.0.0.1:3000/play-the-
 
 **After the agent writes the patch:** `Player contract` plays real overs in Chromium, which draws the 3D stadium in software on the runner: a desktop and a phone (touch taps, reduced motion), in the stadium and in lite mode. It checks the scoreboard, a six on every ball, the bowled ball, the final card and that every button can really be reached. A separate base-branch workflow, `policy/feature-scope`, checks both sides of renames without checking out or executing the PR and posts a status on its head SHA. A feature PR may only change the game and feature tests; a policy change is separate owner-reviewed work. These signals are not mandatory just because their workflows exist. Set the merge rules below before demonstrating enforcement.
 
+`CI build` also stages the static site and runs the tests against that copy on pull requests and pushes to `main`. There is no bundling step, and this workflow does not publish the site.
+
+`Dependabot security` reviews dependency changes against GitHub's advisory data and audits the full npm lockfile, including development dependencies. High or critical findings and audit failures fail the `Dependency security` check. It cannot detect undisclosed vulnerabilities and does not enable Dependabot update PRs. An owner must require that check in the `main` branch rules before it can block merges.
+
 ```sh
 npm ci --ignore-scripts
 npm test
@@ -38,7 +42,7 @@ npm run test:browser
 
 1. **Settings → Code quality → Enable code quality** for JavaScript. Check organization access and billing before confirming. Wait for initial analysis, then refresh/re-run analysis for the PR under review. Do not substitute a lint job labelled “GitHub Code Quality.”
 2. In **Settings → Rules → Rulesets**, create an **Active** branch ruleset targeting **the default branch (`main`)**. Add **Require code quality results → Errors** (or Warnings for a stricter gate). This is the native quality threshold, not a guessed status name. The inherited `release/*` rule alone does not cover `main`.
-3. Require PRs, ≥1 **independent** approval, dismiss stale approvals, resolve conversations, protect owner-controlled files, and require status checks **Player contract** and **policy/feature-scope** from GitHub Actions once observed. Keep the bypass list empty for the demo. If using CodeQL security scanning, add the separate code-scanning results rule after verifying JavaScript analysis. A successful scanner run is not the same as meeting a findings threshold.
+3. Before requiring code-owner review, ensure every owner-controlled path has another eligible owner who can independently review an owner's own PR; until then, leave that rule off and hold owner-authored changes. Then require PRs, ≥1 **independent** approval, dismiss stale approvals, resolve conversations, require code-owner review for owner-controlled files, and require status checks **Player contract**, **Build and test**, **Dependency security**, and **policy/feature-scope** from GitHub Actions once observed. Keep the bypass list empty for the demo. If using CodeQL security scanning, add the separate code-scanning results rule after verifying JavaScript analysis. A successful scanner run is not the same as meeting a findings threshold.
 4. Verify on the actual PR and SHA: open each check, inspect the native quality findings, review the diff and demonstrate a legal shot. No independent reviewer, missing expected analysis, or new commit after review? **Hold.** The person who pushed the local PR cannot count their own approval.
 5. For a future controlled merge, an authorized owner may enable repository auto-merge, then opt a particular PR in. Copilot **Watch and fix / Agent Merge** can remediate selected blockers; GitHub **auto-merge** performs the merge after rules are satisfied. Neither grants an approval or a bypass. Leave both conference PRs unmerged for discussion.
 
