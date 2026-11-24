@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+git diff --cached --no-renames --name-only -z | node scripts/scope.js staged
+npm test

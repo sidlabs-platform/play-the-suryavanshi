@@ -1,0 +1,5 @@
+/.github/ @siddjoshi
+/.githooks/ @siddjoshi
+/scripts/ @siddjoshi
+/package*.json @siddjoshi
+/test/innings.test.js @siddjoshi

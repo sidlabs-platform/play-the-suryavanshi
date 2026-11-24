@@ -1,0 +1,39 @@
+name: Trusted feature boundary
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+jobs:
+  scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      TOTAL: ${{ github.event.pull_request.changed_files }}
+    steps:
+      - name: Mark the candidate pending
+        run: gh api --method POST "repos/$REPO/statuses/$HEAD_SHA" -f context=policy/feature-scope -f state=pending -f description='Checking feature scope' --silent
+      # Only trusted base code runs here. PR file metadata is data, never shell source.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - name: Read a complete file list and check the same head is still current
+        run: |
+          set -euo pipefail
+          gh api --paginate --slurp "repos/$REPO/pulls/$PR/files?per_page=100" | node scripts/scope.js pr "$TOTAL"
+          test "$(gh api "repos/$REPO/pulls/$PR" --jq .head.sha)" = "$HEAD_SHA"
+      - name: Publish result on the exact PR head
+        if: always()
+        env:
+          RESULT: ${{ job.status }}
+        run: |
+          state=failure
+          if [ "$RESULT" = success ]; then state=success; fi
+          gh api --method POST "repos/$REPO/statuses/$HEAD_SHA" -f context=policy/feature-scope -f state="$state" -f description='Game files and feature tests only' --silent
