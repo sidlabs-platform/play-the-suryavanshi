@@ -5,8 +5,10 @@
 <body><main>
 <header><span>FLOODLIGHT ARCADE</span><span>ONE-OVER CRICKET</span></header>
 <div class="mast"><h1>Play the <em>Suryavanshi</em></h1><p>You’re batting as <strong>Vaibhav Suryavanshi</strong>.<br>Six deliveries. Three bowlers. How many sixes?</p></div>
+<div class="mode"><label><input id="chaseMode" type="checkbox"> Last-over challenge: 24 to win from six balls</label><span>Choose before starting an over.</span></div>
 <section class="match" aria-label="Match centre">
 <div class="score"><div><small>On strike</small><b>V. Suryavanshi</b></div><div><small>Runs</small><b id="runs">0</b></div><div><small>Sixes</small><b id="sixes">0</b></div><div><small>Ball</small><b id="ball">1 / 6</b></div></div>
+<div id="chase" class="chase" role="status" hidden></div>
 <svg id="ground" viewBox="0 0 800 200" role="img" aria-label="The bowler delivers to a left-handed batter under floodlights">
 <rect width="800" height="200" fill="#172d49"/><g fill="#9cb7bd"><circle cx="50" cy="45" r="2"/><circle cx="275" cy="34" r="2"/><circle cx="583" cy="22" r="2"/></g>
 <path d="M0 88 Q400 145 800 78 V200 H0Z" fill="#1a6558"/><path d="M0 108 Q400 158 800 99" fill="none" stroke="#95cdb1" stroke-width="2"/>

@@ -1,7 +1,7 @@
-import { OVER, bat, bowlerAt, newInnings, timing } from "./rules.js";
+import { OVER, bat, batChase, bowlerAt, chaseState, newInnings, timing } from "./rules.js";
 
 const $ = id => document.getElementById(id);
-let innings = newInnings(), phase = "ready", release = 0, nextAt = 0, frame = 0, impact = 0;
+let innings = newInnings(), phase = "ready", release = 0, nextAt = 0, frame = 0, impact = 0, challenge = false;
 const motion = !matchMedia("(prefers-reduced-motion: reduce)").matches;
 for (const [id, radius] of [["fourZone", timing.four], ["sixZone", timing.six]]) {
   $(id).style.left = `${100 * (timing.centre - radius)}%`;
@@ -11,6 +11,11 @@ function renderCard() {
   $("runs").textContent = innings.runs;
   $("sixes").textContent = innings.sixes;
   $("ball").textContent = `${Math.min(innings.shots.length + 1, OVER)} / ${OVER}`;
+  $("chase").hidden = !challenge;
+  if (challenge) {
+    const { runsRemaining, ballsRemaining } = chaseState(innings);
+    $("chase").textContent = `${runsRemaining} ${runsRemaining === 1 ? "run" : "runs"} needed from ${ballsRemaining} ${ballsRemaining === 1 ? "ball" : "balls"}`;
+  }
   $("shots").replaceChildren(...Array.from({length: OVER}, (_, i) => {
     const chip = document.createElement("li"), runs = innings.shots[i];
     chip.textContent = runs ?? "–"; if (runs === 6) chip.classList.add("six");
@@ -37,12 +42,12 @@ function positionAt(now) {
   return Math.max(0, Math.min(1, (now - release) / bowlerAt(innings.shots.length).flight));
 }
 function settle(position, now) {
-  innings = bat(innings, position); impact = position; renderCard();
+  innings = (challenge ? batChase : bat)(innings, position); impact = position; renderCard();
   const runs = innings.shots.at(-1);
   $("call").textContent = ["Dot ball.", "Quick single!"][runs] ?? (runs === 6 ? "SIX! Into the stands!" : "FOUR! Through the gap!");
   phase = "between"; nextAt = now + 1050;
   $("action").textContent = "Ball dead"; $("action").setAttribute("aria-disabled", "true");
-  $("tip").textContent = innings.shots.length === OVER ? "The scorer is adding it up." : "Get set for the next delivery.";
+  $("tip").textContent = innings.shots.length === OVER || (challenge && chaseState(innings).result !== "playing") ? "The scorer is adding it up." : "Get set for the next delivery.";
   paint(position);
 }
 function tick(now) {
@@ -52,9 +57,11 @@ function tick(now) {
   } else if (phase === "between") {
     if (motion && innings.shots.at(-1) === 6) paint(impact, 1 - Math.max(0, nextAt - now) / 1050);
     if (now >= nextAt) {
-      if (innings.shots.length < OVER) bowl(now);
+      if (innings.shots.length < OVER && (!challenge || chaseState(innings).result === "playing")) bowl(now);
       else {
-        phase = "done"; $("call").textContent = `Over complete: ${innings.runs} runs!`;
+        phase = "done";
+        $("call").textContent = challenge ? (chaseState(innings).result === "won" ? "Chase won!" : "Chase lost.") : `Over complete: ${innings.runs} runs!`;
+        $("chaseMode").disabled = false;
         $("action").textContent = "Bat again"; $("action").setAttribute("aria-disabled", "false");
         $("tip").textContent = `Vaibhav hit ${innings.sixes} ${innings.sixes === 1 ? "six" : "sixes"}.`;
       }
@@ -66,7 +73,8 @@ function act() {
   const now = performance.now();
   if (phase === "flight") settle(positionAt(now), now);
   else if (phase === "ready" || phase === "done") {
-    cancelAnimationFrame(frame); innings = newInnings(); renderCard(); bowl(now); frame = requestAnimationFrame(tick);
+    cancelAnimationFrame(frame); challenge = $("chaseMode").checked; $("chaseMode").disabled = true;
+    innings = newInnings(); renderCard(); bowl(now); frame = requestAnimationFrame(tick);
   }
 }
 $("action").addEventListener("click", act);

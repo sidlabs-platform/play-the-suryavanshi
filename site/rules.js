@@ -18,3 +18,11 @@ export function bat(innings, position) {
   const runs = runsAt(position);
   return { shots: [...innings.shots, runs], runs: innings.runs + runs, sixes: innings.sixes + Number(runs === 6) };
 }
+export function chaseState(innings) {
+  const runsRemaining = Math.max(0, 24 - innings.runs);
+  const ballsRemaining = OVER - innings.shots.length;
+  return { runsRemaining, ballsRemaining, result: runsRemaining === 0 ? "won" : ballsRemaining === 0 ? "lost" : "playing" };
+}
+export function batChase(innings, position) {
+  return chaseState(innings).result === "playing" ? bat(innings, position) : innings;
+}
