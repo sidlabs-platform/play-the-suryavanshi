@@ -18,11 +18,18 @@
 <section class="bowl" aria-label="Bowler"><small>Bowling</small><b id="bowler">Kite · Seam</b><span id="speed"></span></section>
 </header>
 <p id="notice" role="status"></p>
-<section class="banner"><b id="call" role="status">The crowd is waiting.</b><span id="detail" role="status"></span></section>
+<section class="banner"><b id="call" role="status">The crowd is waiting.</b><span id="detail" role="status"></span><span id="chaseStatus" role="status"></span></section>
 <section class="card title" id="title" aria-label="Welcome">
-<small>Floodlit night · one-over match</small>
+<small>Floodlit night · arcade cricket</small>
 <h1>Play the <em>Suryavanshi</em></h1>
-<p>You’re batting as <strong>Vaibhav Suryavanshi</strong>, left-hander.<br>Six deliveries. Three bowlers. How many sixes?</p>
+<p>You’re batting as <strong>Vaibhav Suryavanshi</strong>, left-hander. Play an over or chase a target.</p>
+<div class="setup">
+<label for="mode">Mode <select id="mode"><option value="over">One over</option><option value="chase">Run chase</option></select></label>
+<div id="chaseSetup" hidden>
+<label for="target">Target <input id="target" type="number" min="1" max="999" step="1" value="30" required></label>
+<label for="overs">Overs <input id="overs" type="number" min="1" max="10" step="1" value="2" required></label>
+</div>
+</div>
 <ul class="keys" aria-label="Controls">
 <li><kbd>←</kbd><span>Off side</span></li>
 <li><kbd>↑</kbd><kbd>Space</kbd><span>Straight</span></li>
@@ -41,6 +48,7 @@
 <g id="spokes"></g><text x="0" y="-86" class="w-lab">BOWLER</text><text x="-92" y="3" class="w-lab w-l">OFF</text><text x="92" y="3" class="w-lab w-r">LEG</text>
 </svg>
 <p class="key"><i class="k6"></i>Six <i class="k4"></i>Four <i class="k1"></i>Single</p>
+<button id="setupAgain" type="button">Change setup</button>
 </section>
 <footer class="dock">
 <div class="rail" role="img" aria-label="Timing meter: swing when the marker reaches the gold zone"><div id="fourZone"></div><div id="sixZone"></div><div id="marker"></div></div>

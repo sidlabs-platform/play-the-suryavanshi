@@ -5,7 +5,7 @@ import { createMatch } from "./match.js";
 import { createSound } from "./sound.js";
 
 const $ = id => document.getElementById(id);
-const el = Object.fromEntries("view runs sixes ball shots bowler speed call detail tip action off leg marker fourZone sixZone guide mute notice total rank wheel spokes".split(" ").map(id => [id, $(id)]));
+const el = Object.fromEntries("view runs sixes ball shots bowler speed call detail tip action off leg marker fourZone sixZone guide mute notice total rank wheel spokes mode target overs chaseSetup chaseStatus setupAgain".split(" ").map(id => [id, $(id)]));
 const body = document.body, query = new URLSearchParams(location.search), low = query.get("q") === "low";
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const match = createMatch(), m = match.state, sound = createSound(), heard = new Set();
@@ -41,13 +41,21 @@ function card(pl) {
 }
 function renderCard() {
   const { runs, sixes, shots } = m.innings;
-  put(el.runs, runs); put(el.sixes, sixes); put(el.ball, `${Math.min(shots.length + 1, OVER)} / ${OVER}`);
+  const completed = shots.length, overStart = Math.floor((match.current?.i ?? 0) / OVER) * OVER;
+  const overShots = shots.slice(overStart, overStart + OVER);
+  put(el.runs, runs); put(el.sixes, sixes);
+  put(el.ball, m.chase ? `Over ${Math.floor(overStart / OVER) + 1}: ${Math.min(overShots.length + 1, OVER)} / ${OVER}` : `${Math.min(shots.length + 1, OVER)} / ${OVER}`);
   el.shots.replaceChildren(...Array.from({ length: OVER }, (_, i) => {
-    const chip = document.createElement("li"), runs = shots[i];
+    const chip = document.createElement("li"), runs = overShots[i];
     chip.textContent = runs ?? "–";
     if (runs === 6) chip.classList.add("six"); else if (runs === 4) chip.classList.add("four"); else if (runs > 0) chip.classList.add("run");
     chip.setAttribute("aria-label", `Ball ${i + 1}: ${runs ?? "not bowled"}`); return chip;
   }));
+  if (m.chase) {
+    const remaining = m.chase.overs * OVER - completed, needed = Math.max(0, m.chase.target - runs);
+    const rate = !needed ? "0.00" : remaining ? (needed * OVER / remaining).toFixed(2) : "—";
+    put(el.chaseStatus, `Target ${m.chase.target} · ${needed} needed from ${remaining} balls · Required rate ${rate} per over`);
+  } else put(el.chaseStatus, "");
 }
 
 // --- what the commentary says about a settled ball
@@ -84,7 +92,9 @@ function renderWheel() {
 
 // --- the match, as the page sees it
 function begin() {
-  if (!match.begin(now())) return;
+  const chase = el.mode.value === "chase" ? { target: el.target.valueAsNumber, overs: el.overs.valueAsNumber } : null;
+  if (chase && (!el.target.reportValidity() || !el.overs.reportValidity())) return;
+  if (!match.begin(now(), chase)) return;
   heard.clear(); card(plan(0)); renderCard(); renderWheel();
   say("Vaibhav takes guard…"); put(el.detail, ""); put(el.tip, "Get set. Swing with ← ↑ → as the ball crosses the gold strip.");
   action("Taking guard…", false); sides(false); sound.tick();
@@ -99,19 +109,20 @@ function handle(e, n) {
   const fresh = n - e.at < 500; // after a long stall the scoreboard catches up quietly
   if (e.type === "start") {
     const { bowler } = e.d.pl;
-    card(e.d.pl); say(`${bowler.name} bowls…`, null, fresh); put(el.detail, ""); put(el.tip, bowler.release); action("Swing!", true); sides(true);
+    card(e.d.pl); renderCard(); say(`${bowler.name} bowls…`, null, fresh); put(el.detail, ""); put(el.tip, bowler.release); action("Swing!", true); sides(true);
   } else if (e.type === "settle") {
     const d = e.d, [call, detail, kind] = result(d);
     renderCard(); renderWheel(); say(call, kind, fresh); put(el.detail, detail);
-    action("Ball dead", false); sides(false); put(el.tip, d.i === OVER - 1 ? "The scorer is adding it up." : "Get set for the next delivery.");
+    action("Ball dead", false); sides(false); put(el.tip, m.chase?.outcome || (!m.chase && d.i === OVER - 1) ? "The scorer is adding it up." : "Get set for the next delivery.");
     if (fresh && !(kind === "dot" && bowled(d))) cheer[kind]();
     if (fresh && kind === "six" && !reduced) navigator.vibrate?.(40);
   } else if (e.type === "lead") {
     card(plan(e.next));
   } else if (e.type === "finish") {
     const { runs, sixes } = m.innings;
-    say(`Over complete: ${runs} runs!`, null, fresh); put(el.detail, ""); put(el.tip, `Vaibhav hit ${sixes} ${sixes === 1 ? "six" : "sixes"}.`);
-    put(el.total, runs); put(el.rank, rank(runs)); action("Bat again", true); sides(false);
+    say(m.chase ? `Chase ${m.chase.outcome}! ${runs} runs!` : `Over complete: ${runs} runs!`, null, fresh); put(el.detail, ""); put(el.tip, `Vaibhav hit ${sixes} ${sixes === 1 ? "six" : "sixes"}.`);
+    put(el.total, runs); put(el.rank, m.chase ? (m.chase.outcome === "won" ? "Target reached. You win!" : "Target missed. You lose.") : rank(runs)); action("Bat again", true); sides(false);
+    renderCard();
   }
 }
 
@@ -168,6 +179,7 @@ addEventListener("keydown", event => {
   sound.unlock();
   if (event.ctrlKey || event.metaKey || event.altKey) return;
   const a = document.activeElement;
+  if ((a?.tagName === "INPUT" && a !== el.guide) || a?.tagName === "SELECT") return;
   // Space is the swing only where it would not already mean something else (a focused checkbox or button keeps its own Space).
   if (event.code === "Space" && restsOn(a)) { event.preventDefault(); if (!event.repeat) act(); return; }
   if (event.repeat) return;
@@ -193,6 +205,11 @@ el.view.addEventListener("pointerdown", event => {
 });
 el.guide.addEventListener("change", () => { guide = el.guide.checked; });
 el.mute.addEventListener("click", toggleSound);
+el.mode.addEventListener("change", () => { el.chaseSetup.hidden = el.mode.value !== "chase"; });
+el.setupAgain.addEventListener("click", () => {
+  if (!match.setup()) return;
+  body.dataset.phase = m.phase; el.mode.focus();
+});
 
 card(plan(0)); renderCard(); renderWheel(); body.dataset.phase = m.phase;
 requestAnimationFrame(loop); boot();
