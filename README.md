@@ -1,6 +1,19 @@
 # Play the Suryavanshi
 
-**[Walk out to bat →](https://sidlabs-platform.github.io/play-the-suryavanshi/)** Play as Vaibhav Suryavanshi in a fictional one-over cricket arcade. Kite bowls seam, Comet bowls pace, Orbit bowls spin. Tap **Swing!** or press **Space** when the marker reaches gold. Can you send all six balls into the stands?
+**[Walk out to bat →](https://sidlabs-platform.github.io/play-the-suryavanshi/)** You are Vaibhav Suryavanshi, a left-hander under floodlights, facing a fictional one-over arcade. Kite bowls seam, Comet bowls pace, Orbit bowls spin. Watch the ball, pick your shot and swing as it reaches the gold strip. Can you send all six balls into the stands?
+
+## How to play
+
+| Do this | Get this |
+| --- | --- |
+| **←** / **A** · **↑** / **W** · **→** / **D** | Off side, straight, leg side. He bats left-handed, so off is the left of your screen. |
+| **Space** (or the big button) | Walk out to bat, then a straight swing. |
+| Tap the left, middle or right third of the stadium | The same three shots, for phones. |
+| **T** / **M** | Pitch guide on or off / sound on or off. |
+
+The key picks the direction; your timing picks the runs. Gold is six, green is four, the edges of the strip are a quick single, and anything outside is a dot ball. The fifth ball is on the stumps: leave it and you’re bowled.
+
+The stadium is procedural, stylised WebGL 2: no downloaded models, textures or audio, and no photoreal broadcast claims. `?q=low` renders at lower resolution, and the game also adapts by itself on slow GPUs. If a browser can’t draw WebGL 2, or you add `?gl=off`, you get **lite mode**: same rules, same timing, scoreboard only.
 
 Static HTML, CSS and JavaScript. No accounts, external assets, API or shared leaderboard. The score is for this innings on this device. Fictional fan project; no endorsement or affiliation.
 
@@ -12,7 +25,7 @@ With Node 22+ installed: `npm start`, then open `http://127.0.0.1:3000/play-the-
 
 **Before the agent writes the patch:** give it a bounded ticket, the existing player contract and a clean branch. Locally, `git config --local core.hooksPath .githooks` installs an early scope-and-test check for commits. Cloud setup requests the same hook. This is feedback, not a permission boundary: local hooks can be skipped. PR code runs in CI with a read-only contents token, no deployment credentials, and no Pages publish job. Don’t give a coding agent a personal admin token.
 
-**After the agent writes the patch:** `Player contract` plays an actual six-ball over in Chromium. A separate base-branch workflow, `policy/feature-scope`, checks both sides of renames without checking out or executing the PR and posts a status on its head SHA. A feature PR may only change the game and feature tests; a policy change is separate owner-reviewed work. These signals are not mandatory just because their workflows exist. Set the merge rules below before demonstrating enforcement.
+**After the agent writes the patch:** `Player contract` plays real overs in Chromium, which draws the 3D stadium in software on the runner: a desktop and a phone (touch taps, reduced motion), in the stadium and in lite mode. It checks the scoreboard, a six on every ball, the bowled ball, the final card and that every button can really be reached. A separate base-branch workflow, `policy/feature-scope`, checks both sides of renames without checking out or executing the PR and posts a status on its head SHA. A feature PR may only change the game and feature tests; a policy change is separate owner-reviewed work. These signals are not mandatory just because their workflows exist. Set the merge rules below before demonstrating enforcement.
 
 ```sh
 npm ci --ignore-scripts
