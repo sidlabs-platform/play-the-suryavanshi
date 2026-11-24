@@ -1,11 +1,12 @@
 // The game: the clock, the controls and the scoreboard. The rules live in rules.js, the timeline in match.js, the picture in scene.js.
 import { OVER, timing } from "./rules.js";
 import { FIELD, contactP, plan, stumpsHit } from "./flight.js";
+import { createClock } from "./clock.js";
 import { createMatch } from "./match.js";
 import { createSound } from "./sound.js";
 
 const $ = id => document.getElementById(id);
-const el = Object.fromEntries("view runs sixes ball shots bowler speed call detail tip action off leg marker fourZone sixZone guide mute notice total rank wheel spokes".split(" ").map(id => [id, $(id)]));
+const el = Object.fromEntries("view runs sixes ball shots bowler speed call detail tip action off leg marker fourZone sixZone guide practice mute notice total rank wheel spokes".split(" ").map(id => [id, $(id)]));
 const body = document.body, query = new URLSearchParams(location.search), low = query.get("q") === "low";
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const match = createMatch(), m = match.state, sound = createSound(), heard = new Set();
@@ -16,13 +17,11 @@ for (const [id, radius] of [["fourZone", timing.four], ["sixZone", timing.six]])
   el[id].style.width = `${200 * radius}%`;
 }
 
-// --- the clock: it stops while the tab is hidden, so a ball in flight waits for you instead of playing itself out
-let offset = 0, hiddenAt = null;
-const now = () => performance.now() - offset;
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) hiddenAt = performance.now();
-  else if (hiddenAt != null) { offset += performance.now() - hiddenAt; hiddenAt = null; }
-});
+// --- the clock: it stops while the tab is hidden, so a ball in flight waits for you instead of playing itself out.
+// Practice nets run it at half speed; the zones are fractions of the flight, so the scoring is the same.
+const clock = createClock(), now = clock.now, netsRate = () => el.practice.checked ? 0.5 : 1;
+clock.setRate(netsRate()); // a browser can restore a ticked box on reload
+document.addEventListener("visibilitychange", () => document.hidden ? clock.hide() : clock.show());
 
 // --- small writers: only touch the page when a value changed
 const put = (node, value) => { value = String(value); if (node.textContent !== value) node.textContent = value; };
@@ -36,7 +35,7 @@ function say(text, kind, fresh) {
   if (fresh && !reduced) el.call.animate?.([{ transform: "scale(.88)", opacity: 0.3 }, { transform: "scale(1)", opacity: 1 }], { duration: 260, easing: "cubic-bezier(.2,.9,.3,1.3)" });
 }
 function card(pl) {
-  put(el.bowler, `${pl.bowler.name} · ${pl.bowler.style}`); put(el.speed, `${pl.prof.kmh} km/h`);
+  put(el.bowler, `${pl.bowler.name} · ${pl.bowler.style}`); put(el.speed, `${Math.round(pl.prof.kmh * clock.rate)} km/h${clock.rate < 1 ? " · nets" : ""}`);
   body.style.setProperty("--b", pl.bowler.color);
 }
 function renderCard() {
@@ -85,6 +84,8 @@ function renderWheel() {
 // --- the match, as the page sees it
 function begin() {
   if (!match.begin(now())) return;
+  if (document.activeElement === el.practice) el.practice.blur(); // keep the arrow keys and Space for the swing
+  el.practice.disabled = true; // the pace is chosen between overs, never during one
   heard.clear(); card(plan(0)); renderCard(); renderWheel();
   say("Vaibhav takes guard…"); put(el.detail, ""); put(el.tip, "Get set. Swing with ← ↑ → as the ball crosses the gold strip.");
   action("Taking guard…", false); sides(false); sound.tick();
@@ -111,7 +112,7 @@ function handle(e, n) {
   } else if (e.type === "finish") {
     const { runs, sixes } = m.innings;
     say(`Over complete: ${runs} runs!`, null, fresh); put(el.detail, ""); put(el.tip, `Vaibhav hit ${sixes} ${sixes === 1 ? "six" : "sixes"}.`);
-    put(el.total, runs); put(el.rank, rank(runs)); action("Bat again", true); sides(false);
+    put(el.total, runs); put(el.rank, rank(runs)); action("Bat again", true); sides(false); el.practice.disabled = false;
   }
 }
 
@@ -148,7 +149,7 @@ async function boot() {
 let wall = performance.now(), avg = 16, slow = 0;
 function loop() {
   requestAnimationFrame(loop);
-  const n = now(), clock = performance.now(), dt = clock - wall; wall = clock;
+  const n = now(), t = performance.now(), dt = t - wall; wall = t;
   for (const e of match.update(n)) handle(e, n);
   ambient(n); paint(n);
   if (!scene) return;
@@ -192,6 +193,9 @@ el.view.addEventListener("pointerdown", event => {
   swing(x < 1 / 3 ? "off" : x > 2 / 3 ? "leg" : "straight");
 });
 el.guide.addEventListener("change", () => { guide = el.guide.checked; });
+el.practice.addEventListener("change", () => {
+  if (m.phase === "title" || m.phase === "done") clock.setRate(netsRate()); else el.practice.checked = clock.rate < 1;
+});
 el.mute.addEventListener("click", toggleSound);
 
 card(plan(0)); renderCard(); renderWheel(); body.dataset.phase = m.phase;
