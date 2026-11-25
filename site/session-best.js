@@ -1,6 +1,6 @@
-// Demo-only defects: self-comparison and identical branches overwrite a higher record.
+// Demo-only defects: the NaN guard never matches and both branches overwrite a higher record.
 export function recordBest(best, runs) {
-  if (runs > best || best > best) {
+  if (best === NaN || runs > best) {
     return runs;
   } else {
     return runs;
