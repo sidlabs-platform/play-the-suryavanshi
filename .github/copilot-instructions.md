@@ -1,3 +1,6 @@
-Implement gameplay tickets in `site/` and new regression tests under `test/features/`. Keep paths relative for project Pages and the game keyboard-playable. Do not alter the referee: protected contracts, policy, CI, packages and deployment require separately authorized maintenance. Launch the game and earn the score through actual deliveries. Report observed evidence and one limitation in the PR. Never approve or merge your own work.
-
-Map of the game: `site/rules.js` is the scoring contract (do not change what it returns), `site/flight.js` is the ball physics, `site/match.js` is the timeline of an over, `site/game.js` is the clock, controls and scoreboard, and `site/scene.js` with `stadium.js` draws the 3D stadium. `npm run test:browser` plays real overs in Chromium and depends on the element ids, button labels and the final `Over complete: N runs!` line in `site/index.html` and `site/game.js`, so keep them. Run `npm test` and `npm run test:browser` before you push.
+- Always use the `ponytail` skill in `ultra` mode when writing code unless asked not to.
+- Before pushing code to a remote, use `/secret-scanning` and `/dependency-scanning`. Run `npm test` and `npm run test:browser` before pushing.
+- Implement gameplay tickets in `site/` and new regression tests under `test/features/`. Keep paths relative for project Pages and the game keyboard-playable.
+- Do not alter the referee: protected contracts, policy, CI, packages and deployment require separately authorized maintenance. Do not change the return values of `site/rules.js`.
+- Preserve the element IDs, button labels and final `Over complete: N runs!` line used by the browser tests in `site/index.html` and `site/game.js`.
+- Launch the game and earn the score through actual deliveries. Report observed evidence and one limitation in the PR. Never approve or merge your own work.
