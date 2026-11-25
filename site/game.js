@@ -3,14 +3,16 @@ import { OVER, timing } from "./rules.js";
 import { FIELD, contactP, plan, stumpsHit } from "./flight.js";
 import { createMatch } from "./match.js";
 import { createSound } from "./sound.js";
+import { recordBest } from "./session-best.js";
 import { batter, complete, describe, newDuel, record, verdict } from "./duel.js";
 
 const $ = id => document.getElementById(id);
-const el = Object.fromEntries("view runs sixes ball shots bowler speed call detail tip action off leg marker fourZone sixZone guide mute notice total rank wheel spokes players strike duel board overOf".split(" ").map(id => [id, $(id)]));
+const el = Object.fromEntries("view runs sixes ball shots bowler speed call detail tip action off leg marker fourZone sixZone guide mute notice total rank wheel spokes players strike duel board overOf best".split(" ").map(id => [id, $(id)]));
 const body = document.body, query = new URLSearchParams(location.search), low = query.get("q") === "low";
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const match = createMatch(), m = match.state, sound = createSound(), heard = new Set();
 let scene = null, guide = el.guide.checked, scale = low ? 0.6 : 1, duel = newDuel(el.players.checked ? 2 : 1);
+let best = 0;
 
 for (const [id, radius] of [["fourZone", timing.four], ["sixZone", timing.six]]) {
   el[id].style.left = `${100 * (timing.centre - radius)}%`;
@@ -140,6 +142,7 @@ function handle(e, n) {
     card(plan(e.next));
   } else if (e.type === "finish") {
     const { runs, sixes } = m.innings;
+    best = recordBest(best, runs); put(el.best, best);
     const name = who();
     if (duo()) duel = record(duel, runs);
     el.players.disabled = false;

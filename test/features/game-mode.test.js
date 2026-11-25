@@ -67,6 +67,7 @@ test("changing player mode after an over clears match details and keeps an over 
 
   toggle(true);
   playOver();
+  assert.equal(get("best").textContent, "36");
   assert.match(get("detail").textContent, /needs 37 to win/);
   toggle(false);
   assertReset();
