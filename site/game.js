@@ -55,10 +55,11 @@ function renderCard() {
 const duo = () => duel.players === 2, who = () => duo() ? `Player ${batter(duel) + 1}` : "Vaibhav";
 function renderDuel() {
   body.dataset.players = String(duel.players);
-  if (!duo()) { put(el.strike, "On strike"); put(el.overOf, "Your over"); el.board.replaceChildren(); return; }
+  put(el.overOf, m.phase === "done" ? "Over summary" : duo() ? `Player ${batter(duel) + 1}’s over` : "Your over");
+  if (!duo()) { put(el.strike, "On strike"); el.board.replaceChildren(); return; }
   const live = m.phase !== "title" && !complete(duel) && m.phase !== "done" ? m.innings.runs : null, n = batter(duel), v = verdict(duel);
   const score = i => duel.totals[i] ?? (i === n && live != null ? live : null);
-  put(el.strike, `P${n + 1} on strike`); put(el.overOf, `Player ${(m.phase === "done" ? duel.totals.length : n + 1)}’s over`);
+  put(el.strike, `P${n + 1} on strike`);
   put(el.duel, [0, 1].map(i => `P${i + 1} ${score(i) ?? "–"}`).join(" · "));
   el.board.replaceChildren(...[0, 1].map(i => {
     const row = document.createElement("li"), name = document.createElement("span"), runs = document.createElement("b");
@@ -71,7 +72,10 @@ function renderDuel() {
 function setPlayers(two) {
   if (m.phase !== "title" && m.phase !== "done") { el.players.checked = duo(); return; }
   el.players.checked = two; duel = newDuel(two ? 2 : 1); renderDuel();
-  if (m.phase === "done") { action(two ? "Start match" : "Bat again", true); put(el.tip, two ? "Player 1 bats first." : ""); }
+  if (m.phase === "done") {
+    put(el.detail, ""); put(el.rank, rank(Number(el.total.textContent)));
+    action(two ? "Start match" : "Bat again", true); put(el.tip, two ? "Player 1 bats first." : "");
+  }
 }
 
 // --- what the commentary says about a settled ball
