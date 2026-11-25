@@ -49,11 +49,15 @@ kbd{min-width:30px;padding:4px 8px;text-align:center;font:800 14px/1 var(--cond)
 #wheel{width:min(220px,48vw);height:auto}.w-field{fill:#0f3a27;stroke:#2f7a55}.w-ring{fill:none;stroke:#2f7a55;stroke-width:.8;stroke-dasharray:3 3}.w-pitch{fill:#c8a97a}
 .w-lab{font:700 7px var(--cond);letter-spacing:.2em;fill:#9fd3b6;text-anchor:middle}.w-l{text-anchor:start}.w-r{text-anchor:end}#spokes line{stroke-linecap:round;stroke-width:2.6}
 .key{margin:0;font:600 13px var(--cond);color:var(--mute);display:flex;gap:6px 12px;align-items:center;justify-content:center}.key i{display:inline-block;width:14px;height:4px;border-radius:2px;margin-right:5px;vertical-align:middle}
+#board{list-style:none;margin:0;padding:0;display:grid;gap:4px;width:100%}#board:empty{display:none}
+#board li{display:flex;justify-content:space-between;padding:4px 10px;border:1px solid var(--line);border-radius:6px;font:700 15px var(--cond);letter-spacing:.06em;text-transform:uppercase;font-variant-numeric:tabular-nums}
+#board li.win{border-color:var(--gold);color:var(--gold)}#board li.now{border-color:#fff}
+body:not([data-players="2"]) .bug .match{display:none}#duel{font-size:clamp(15px,1.7vw,19px);white-space:nowrap}
 .k6{background:var(--gold)}.k4{background:var(--mint)}.k1{background:#fff}
 
 .dock{grid-row:3;grid-column:1;justify-self:center;width:min(760px,100%);padding:10px 14px 8px;display:grid;gap:6px 10px;grid-template-columns:auto 1fr auto;
 grid-template-areas:"rail rail rail" "leg leg leg" "pad pad pad" "guide tip sound"}
-.rail{grid-area:rail}.legend{grid-area:leg}.pad{grid-area:pad}.opts{display:contents}.opts label{grid-area:guide}#tip{grid-area:tip}#mute{grid-area:sound}
+.rail{grid-area:rail}.legend{grid-area:leg}.pad{grid-area:pad}.opts{display:contents}.opts .toggles{grid-area:guide;display:flex;flex-wrap:wrap;gap:0 14px}#tip{grid-area:tip}#mute{grid-area:sound}
 .rail{position:relative;height:16px;border-radius:8px;overflow:hidden;background:linear-gradient(#2a3a5a,#1b2740);border:1px solid #5a74a8}
 .rail div{position:absolute;top:0;bottom:0}#fourZone{background:#2fae80}#sixZone{background:var(--gold)}
 #marker{width:4px;background:#fff;box-shadow:0 0 10px #fff,0 0 0 1px #0007;transform:translateX(-50%)}
@@ -66,7 +70,7 @@ button:active{transform:translateY(2px);box-shadow:0 1px 0 #153585}
 button[aria-disabled="true"]{opacity:.5;cursor:default}button[aria-disabled="true"]:active{transform:none}
 button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:3px}
 #tip{margin:0;text-align:center;font:500 14px/1.3 var(--cond);color:var(--mute);min-height:1.3em}
-.opts{font:600 13px var(--cond);color:var(--mute)}.opts label{justify-self:start}#mute{justify-self:end}
+.opts{font:600 13px var(--cond);color:var(--mute)}.opts .toggles{justify-self:start}#mute{justify-self:end}
 label{display:flex;align-items:center;gap:8px;min-height:34px;cursor:pointer}input{width:18px;height:18px;margin:0;accent-color:var(--gold)}
 #mute{min-height:34px;padding:6px 14px;font-size:13px;color:var(--mute);background:#16203a;box-shadow:none;border:1px solid var(--line)}
 #mute[aria-pressed="true"]{color:var(--gold);border-color:var(--gold)}#mute:active{box-shadow:none}
