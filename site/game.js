@@ -3,13 +3,14 @@ import { OVER, timing } from "./rules.js";
 import { FIELD, contactP, plan, stumpsHit } from "./flight.js";
 import { createMatch } from "./match.js";
 import { createSound } from "./sound.js";
+import { batter, complete, describe, newDuel, record, verdict } from "./duel.js";
 
 const $ = id => document.getElementById(id);
-const el = Object.fromEntries("view runs sixes ball shots bowler speed call detail tip action off leg marker fourZone sixZone guide mute notice total rank wheel spokes".split(" ").map(id => [id, $(id)]));
+const el = Object.fromEntries("view runs sixes ball shots bowler speed call detail tip action off leg marker fourZone sixZone guide mute notice total rank wheel spokes players strike duel board overOf".split(" ").map(id => [id, $(id)]));
 const body = document.body, query = new URLSearchParams(location.search), low = query.get("q") === "low";
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const match = createMatch(), m = match.state, sound = createSound(), heard = new Set();
-let scene = null, guide = el.guide.checked, scale = low ? 0.6 : 1;
+let scene = null, guide = el.guide.checked, scale = low ? 0.6 : 1, duel = newDuel(el.players.checked ? 2 : 1);
 
 for (const [id, radius] of [["fourZone", timing.four], ["sixZone", timing.six]]) {
   el[id].style.left = `${100 * (timing.centre - radius)}%`;
@@ -50,6 +51,33 @@ function renderCard() {
   }));
 }
 
+// --- two-player match: whose over it is, and the totals side by side on the same scoreboard
+const duo = () => duel.players === 2, who = () => duo() ? `Player ${batter(duel) + 1}` : "Vaibhav";
+function renderDuel() {
+  body.dataset.players = String(duel.players);
+  put(el.overOf, m.phase === "done" ? "Over summary" : duo() ? `Player ${batter(duel) + 1}’s over` : "Your over");
+  if (!duo()) { put(el.strike, "On strike"); el.board.replaceChildren(); return; }
+  const live = m.phase !== "title" && !complete(duel) && m.phase !== "done" ? m.innings.runs : null, n = batter(duel), v = verdict(duel);
+  const score = i => duel.totals[i] ?? (i === n && live != null ? live : null);
+  put(el.strike, `P${n + 1} on strike`);
+  put(el.duel, [0, 1].map(i => `P${i + 1} ${score(i) ?? "–"}`).join(" · "));
+  el.board.replaceChildren(...[0, 1].map(i => {
+    const row = document.createElement("li"), name = document.createElement("span"), runs = document.createElement("b");
+    name.textContent = `Player ${i + 1}`; runs.textContent = duel.totals[i] ?? "yet to bat";
+    if (v && v.winner === i) row.classList.add("win");
+    if (!v && i === duel.totals.length) row.classList.add("now");
+    row.append(name, runs); return row;
+  }));
+}
+function setPlayers(two) {
+  if (m.phase !== "title" && m.phase !== "done") { el.players.checked = duo(); return; }
+  el.players.checked = two; duel = newDuel(two ? 2 : 1); renderDuel();
+  if (m.phase === "done") {
+    put(el.detail, ""); put(el.rank, rank(Number(el.total.textContent)));
+    action(two ? "Start match" : "Bat again", true); put(el.tip, two ? "Player 1 bats first." : "");
+  }
+}
+
 // --- what the commentary says about a settled ball
 const near = (x, z) => FIELD.reduce((a, f) => Math.hypot(f.at[0] - x, f.at[1] - z) < Math.hypot(a.at[0] - x, a.at[1] - z) ? f : a).name;
 const feel = (kind, off) => Math.abs(off) < 0.012 ? "Perfect timing" : kind === "six" ? "Middled it" : kind === "four" ? `A touch ${off < 0 ? "early" : "late"}` : `Mistimed ${off < 0 ? "early" : "late"}`;
@@ -84,9 +112,11 @@ function renderWheel() {
 
 // --- the match, as the page sees it
 function begin() {
+  if (m.phase === "done" && complete(duel)) duel = newDuel(duel.players);
   if (!match.begin(now())) return;
-  heard.clear(); card(plan(0)); renderCard(); renderWheel();
-  say("Vaibhav takes guard…"); put(el.detail, ""); put(el.tip, "Get set. Swing with ← ↑ → as the ball crosses the gold strip.");
+  el.players.disabled = true;
+  heard.clear(); card(plan(0)); renderCard(); renderWheel(); renderDuel();
+  say(`${who()} takes guard…`); put(el.detail, ""); put(el.tip, "Get set. Swing with ← ↑ → as the ball crosses the gold strip.");
   action("Taking guard…", false); sides(false); sound.tick();
 }
 function swing(dir) {
@@ -102,7 +132,7 @@ function handle(e, n) {
     card(e.d.pl); say(`${bowler.name} bowls…`, null, fresh); put(el.detail, ""); put(el.tip, bowler.release); action("Swing!", true); sides(true);
   } else if (e.type === "settle") {
     const d = e.d, [call, detail, kind] = result(d);
-    renderCard(); renderWheel(); say(call, kind, fresh); put(el.detail, detail);
+    renderCard(); renderWheel(); renderDuel(); say(call, kind, fresh); put(el.detail, detail);
     action("Ball dead", false); sides(false); put(el.tip, d.i === OVER - 1 ? "The scorer is adding it up." : "Get set for the next delivery.");
     if (fresh && !(kind === "dot" && bowled(d))) cheer[kind]();
     if (fresh && kind === "six" && !reduced) navigator.vibrate?.(40);
@@ -110,8 +140,15 @@ function handle(e, n) {
     card(plan(e.next));
   } else if (e.type === "finish") {
     const { runs, sixes } = m.innings;
-    say(`Over complete: ${runs} runs!`, null, fresh); put(el.detail, ""); put(el.tip, `Vaibhav hit ${sixes} ${sixes === 1 ? "six" : "sixes"}.`);
-    put(el.total, runs); put(el.rank, rank(runs)); action("Bat again", true); sides(false);
+    const name = who();
+    if (duo()) duel = record(duel, runs);
+    el.players.disabled = false;
+    say(`Over complete: ${runs} runs!`, null, fresh); put(el.detail, ""); put(el.tip, `${name} hit ${sixes} ${sixes === 1 ? "six" : "sixes"}.`);
+    put(el.total, runs); put(el.rank, rank(runs)); sides(false);
+    if (!duo()) action("Bat again", true);
+    else if (!complete(duel)) { action(`Player ${batter(duel) + 1} bats`, true); put(el.detail, `Player ${batter(duel) + 1} needs ${runs + 1} to win`); }
+    else { action("New match", true); put(el.detail, describe(duel)); put(el.rank, describe(duel)); }
+    renderDuel();
   }
 }
 
@@ -161,6 +198,7 @@ function loop() {
 
 // --- controls
 const KEYS = { ArrowUp: "straight", KeyW: "straight", ArrowLeft: "off", KeyA: "off", ArrowRight: "leg", KeyD: "leg" };
+const togglePlayers = () => setPlayers(!el.players.checked);
 const toggleGuide = () => { el.guide.checked = !el.guide.checked; guide = el.guide.checked; };
 const toggleSound = () => { const muted = sound.toggle(); el.mute.setAttribute("aria-pressed", String(!muted)); };
 const restsOn = a => a === body || a === el.action;
@@ -175,6 +213,7 @@ addEventListener("keydown", event => {
   if (dir) { if (restsOn(a) || a?.tagName === "BUTTON" || a === el.guide) { event.preventDefault(); swing(dir); } }
   else if (event.code === "KeyT") toggleGuide();
   else if (event.code === "KeyM") toggleSound();
+  else if (event.code === "KeyP") togglePlayers();
 });
 addEventListener("keyup", event => { if (event.code === "Space" && restsOn(document.activeElement)) event.preventDefault(); });
 for (const type of ["pointerdown", "touchend", "click"]) addEventListener(type, () => sound.unlock(), { capture: true, passive: true });
@@ -192,7 +231,8 @@ el.view.addEventListener("pointerdown", event => {
   swing(x < 1 / 3 ? "off" : x > 2 / 3 ? "leg" : "straight");
 });
 el.guide.addEventListener("change", () => { guide = el.guide.checked; });
+el.players.addEventListener("change", () => setPlayers(el.players.checked));
 el.mute.addEventListener("click", toggleSound);
 
-card(plan(0)); renderCard(); renderWheel(); body.dataset.phase = m.phase;
+card(plan(0)); renderCard(); renderWheel(); renderDuel(); body.dataset.phase = m.phase;
 requestAnimationFrame(loop); boot();
