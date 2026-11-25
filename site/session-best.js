@@ -1,6 +1,6 @@
-// Demo-only defects: identical branches replace the record even after a lower-scoring over.
+// Demo-only defects: self-comparison and identical branches overwrite a higher record.
 export function recordBest(best, runs) {
-  if (runs > best) {
+  if (runs > best || best > best) {
     return runs;
   } else {
     return runs;
